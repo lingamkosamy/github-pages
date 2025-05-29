@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lesson‑Plan Dashboard</title>
+  <!-- Google Charts → pie, column, table -->
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha512-ru9F6zUCemsO5rxr9Qn7A2PHIwKOVe8Sc+eSMkmGi0x0zYvHnwdH+AM7Be4OLMQLJ8acSCtYmAnPq2mPvE0ANA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f5f7fb;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    #charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+    #raw-table {
+      margin-top: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 1rem;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+    }
+  </style>
+</head>
+<body>
+  <h1>Lesson & Session Plan Status Dashboard</h1>
+  <p style="text-align:center;">Sheet ID: <code>1fqk9DvPSLK5CrWEzdQvara9vY60HbROrxVbLgZmVXJ0</code></p>
+
+  <div id="charts">
+    <div id="lessonChart" class="card"></div>
+    <div id="sessionChart" class="card"></div>
+  </div>
+
+  <div id="raw-table" class="card"></div>
+
+  <script>
+    // 1️⃣ CONFIGURATION  ─────────────────────────────────────────────┐
+    const SHEET_ID = "1fqk9DvPSLK5CrWEzdQvara9vY60HbROrxVbLgZmVXJ0"; // <- keep
+    const SHEET_NAME = "Raw Data"; // <‑ rename if your tab differs
+    // CSV export url (public‑read or share‑with‑link required)
+    const CSV_URL =
+      `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+        SHEET_NAME
+      )}`;
+    // 2️⃣ LOAD GOOGLE CHARTS  ────────────────────────────────────────┘
+    google.charts.load("current", { packages: ["corechart", "table"] });
+    google.charts.setOnLoadCallback(init);
+
+    function init() {
+      fetchAndDraw();
+      // refresh every 5 min (optional)
+      // setInterval(fetchAndDraw, 5 * 60 * 1000);
+    }
+
+    function fetchAndDraw() {
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        complete: (results) => {
+          const data = results.data.filter((row) => row["Faculty Name"]);
+          drawDashboard(data);
+        },
+        error: (err) => {
+          alert("Error loading sheet: " + err);
+        },
+      });
+    }
+
+    function drawDashboard(rows) {
+      // Helper to count status frequencies
+      const countBy = (rows, field) => {
+        const map = {};
+        rows.forEach((r) => {
+          const key = (r[field] || "Unknown").trim();
+          map[key] = (map[key] || 0) + 1;
+        });
+        return Object.entries(map);
+      };
+
+      const lessonCounts = countBy(rows, "Lesson Plan Status");
+      const sessionCounts = countBy(rows, "Session Plan Status");
+
+      const toDataTable = (pairs) => {
+        const dt = new google.visualization.DataTable();
+        dt.addColumn("string", "Status");
+        dt.addColumn("number", "Count");
+        dt.addRows(pairs);
+        return dt;
+      };
+
+      const lessonData = toDataTable(lessonCounts);
+      const sessionData = toDataTable(sessionCounts);
+
+      const pieOptions = (title) => ({
+        title,
+        sliceVisibilityThreshold: 0,
+        legend: { position: "bottom" },
+        chartArea: { width: "90%", height: "75%" },
+      });
+
+      new google.visualization.PieChart(
+        document.getElementById("lessonChart")
+      ).draw(lessonData, pieOptions("Lesson Plan Status"));
+
+      new google.visualization.PieChart(
+        document.getElementById("sessionChart")
+      ).draw(sessionData, pieOptions("Session Plan Status"));
+
+      // Raw data table
+      const table = new google.visualization.Table(
+        document.getElementById("raw-table")
+      );
+      const tableData = new google.visualization.DataTable();
+      const cols = Object.keys(rows[0]);
+      cols.forEach((c) => tableData.addColumn("string", c));
+      rows.forEach((r) => tableData.addRow(cols.map((c) => r[c])));
+      table.draw(tableData, {
+        showRowNumber: false,
+        width: "100%",
+        height: "400px",
+      });
+    }
+  </script>
+</body>
+</html>
